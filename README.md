@@ -1,163 +1,117 @@
-<table width="100%">
-  <tr>
-    <td align="left" width="120">
-      <img src="apps/web/src/app/icon.svg" alt="Cutia Logo" width="100" />
-    </td>
-    <td align="right">
-      <h1>Cutia</span></h1>
-      <h3 style="margin-top: -10px;">A free, open-source video editor for web, desktop, and mobile.</h3>
-    </td>
-  </tr>
-</table>
+# Cutia
 
+<p>
+  Privacy-first, open-source video editing.<br />
+  Build, trim, layer, and export directly from your browser.
+</p>
 
-> NOTE: fork from opencut(#fca99d6126c31fbb18ed9f1034cee6f940b040e8)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](.github/CONTRIBUTING.md)
 
-## Why?
+---
 
-- **Privacy**: Your videos stay on your device
-- **Free features**: Most basic CapCut features are now paywalled 
-- **Simple**: People want editors that are easy to use - CapCut proved that
+## At a Glance
 
-## Features
+Cutia is designed for creators who want a clean editing workflow without subscriptions, tracking, or watermark traps.
 
-- Timeline-based editing
-- Multi-track support
-- Real-time preview
-- No watermarks or subscriptions
+- Local-first editing mindset
+- Timeline-based multi-track workflow
+- Real-time preview while editing
+- Open-source and contribution-friendly
 
-## Project Structure
+## Why Cutia Exists
 
-- `apps/web/` – Main Next.js web application
-- `src/components/` – UI and editor components
-- `src/hooks/` – Custom React hooks
-- `src/lib/` – Utility and API logic
-- `src/stores/` – State management (Zustand, etc.)
-- `src/types/` – TypeScript types
+Most lightweight editors are either too limited or progressively locked behind paywalls.  
+Cutia focuses on a simple idea: powerful basics should stay accessible.
 
-## Getting Started
+## What You Can Do
 
-### Prerequisites
+- Arrange clips in a timeline
+- Layer video, text, audio, and stickers
+- Preview changes in real time
+- Export without watermark pressure
 
-Before you begin, ensure you have the following installed on your system:
+## Stack Snapshot
 
-- [Node.js](https://nodejs.org/en/) (v18 or later)
-- [Bun](https://bun.sh/docs/installation)
-  (for `npm` alternative)
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- `Next.js` application in `apps/web`
+- `Bun` for dependency management and scripts
+- `PostgreSQL + Redis` (optional for frontend-only work)
+- `TypeScript` across the project
 
-> **Note:** Docker is optional, but it's essential for running the local database and Redis services. If you're planning to run the frontend or want to contribute to frontend features, you can skip the Docker setup. If you have followed the steps below in [Setup](#setup), you're all set to go!
+## Quick Start (Fast Path)
 
-### Setup
+```bash
+git clone <your-fork-url>
+cd cutia/apps/web
+cp .env.example .env.local
+bun install
+bun dev
+```
 
-1. Fork the repository
-2. Clone your fork locally
-3. Navigate to the web app directory: `cd apps/web`
-4. Copy `.env.example` to `.env.local`:
+Open `http://localhost:3000`.
 
-   ```bash
-   # Unix/Linux/Mac
-   cp .env.example .env.local
+## Full Local Setup (With Services)
 
-   # Windows Command Prompt
-   copy .env.example .env.local
+From repository root:
 
-   # Windows PowerShell
-   Copy-Item .env.example .env.local
-   ```
+```bash
+docker-compose up -d
+```
 
-5. Install dependencies: `bun install`
-6. Start the development server: `bun dev`
+Then in `apps/web`:
 
-## Development Setup
+```bash
+cp .env.example .env.local
+```
 
-### Local Development
+Required env values:
 
-1. Start the database and Redis services:
+```bash
+DATABASE_URL="postgresql://cutia:cutia@localhost:5432/cutia"
+BETTER_AUTH_SECRET="your-generated-secret-here"
+BETTER_AUTH_URL="http://localhost:3000"
+UPSTASH_REDIS_REST_URL="http://localhost:8079"
+UPSTASH_REDIS_REST_TOKEN="example_token"
+NODE_ENV="development"
+```
 
-   ```bash
-   # From project root
-   docker-compose up -d
-   ```
+Generate `BETTER_AUTH_SECRET`:
 
-2. Navigate to the web app directory:
+```bash
+openssl rand -base64 32
+```
 
-   ```bash
-   cd apps/web
-   ```
+Run:
 
-3. Copy `.env.example` to `.env.local`:
-
-   ```bash
-   # Unix/Linux/Mac
-   cp .env.example .env.local
-
-   # Windows Command Prompt
-   copy .env.example .env.local
-
-   # Windows PowerShell
-   Copy-Item .env.example .env.local
-   ```
-
-4. Configure required environment variables in `.env.local`:
-
-   **Required Variables:**
-
-   ```bash
-   # Database (matches docker-compose.yaml)
-   DATABASE_URL="postgresql://cutia:cutia@localhost:5432/cutia"
-
-   # Generate a secure secret for Better Auth
-   BETTER_AUTH_SECRET="your-generated-secret-here"
-   BETTER_AUTH_URL="http://localhost:3000"
-
-   # Redis (matches docker-compose.yaml)
-   UPSTASH_REDIS_REST_URL="http://localhost:8079"
-   UPSTASH_REDIS_REST_TOKEN="example_token"
-
-   # Development
-   NODE_ENV="development"
-   ```
-
-   **Generate BETTER_AUTH_SECRET:**
-
-   ```bash
-   # Unix/Linux/Mac
-   openssl rand -base64 32
-
-   # Windows PowerShell (simple method)
-   [System.Web.Security.Membership]::GeneratePassword(32, 0)
-
-   # Cross-platform (using Node.js)
-   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-
-   # Or use an online generator: https://generate-secret.vercel.app/32
-   ```
-
-5. Run database migrations: `bun run db:migrate` from (inside apps/web)
-6. Start the development server: `bun run dev` from (inside apps/web)
-
-The application will be available at [http://localhost:3000](http://localhost:3000).
+```bash
+bun run db:migrate
+bun run dev
+```
 
 ## Contributing
 
-We welcome contributions! While we're actively developing and refactoring certain areas, there are plenty of opportunities to contribute effectively.
+Contributions are welcome. Check `.github/CONTRIBUTING.md` before opening a PR.
 
-**🎯 Focus areas:** Timeline functionality, project management, performance, bug fixes, and UI improvements outside the preview panel.
+Current high-impact areas:
 
-**⚠️ Avoid for now:** Preview panel enhancements (fonts, stickers, effects) and export functionality - we're refactoring these with a new binary rendering approach.
+- Timeline behavior and interaction quality
+- Project management and reliability
+- Performance tuning and bug fixing
+- UI improvements outside preview internals
 
-See our [Contributing Guide](.github/CONTRIBUTING.md) for detailed setup instructions, development guidelines, and complete focus area guidance.
+Areas currently under active refactor:
 
-**Quick start for contributors:**
+- Preview panel internals (fonts/stickers/effects)
+- Export pipeline internals
 
-- Fork the repo and clone locally
-- Follow the setup instructions in CONTRIBUTING.md
-- Create a feature branch and submit a PR
----
+## Deploy
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmsgbyte%2Fcutia&project-name=cutia&repository-name=cutia)
 
 ## License
 
-[MIT LICENSE](LICENSE)
+Released under the [MIT License](LICENSE).
+
+<p align="right">
+  <sub><sup>NOTE: fork from opencut (#fca99d6126c31fbb18ed9f1034cee6f940b040e8)</sup></sub>
+</p>
