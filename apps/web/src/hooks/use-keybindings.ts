@@ -33,6 +33,13 @@ export function useKeybindingsListener() {
 				return;
 			}
 
+			const target = ev.target as HTMLElement | null;
+
+			const isInKeybindingFreeZone = target?.closest(
+				"[data-keybinding-free]",
+			);
+			if (isInKeybindingFreeZone) return;
+
 			const activeElement = document.activeElement;
 			const isTextInput =
 				activeElement &&
@@ -41,6 +48,10 @@ export function useKeybindingsListener() {
 					(activeElement as HTMLElement).isContentEditable);
 
 			if (isTextInput) return;
+
+			const hasTextSelection =
+				(window.getSelection()?.toString().length ?? 0) > 0;
+			if (hasTextSelection) return;
 
 			ev.preventDefault();
 			ev.stopPropagation();

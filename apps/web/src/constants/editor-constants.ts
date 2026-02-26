@@ -11,5 +11,6 @@ export const PANEL_CONFIG = {
 		properties: 25,
 		mainContent: 50,
 		timeline: 50,
+		agent: 20,
 	},
 };

@@ -24,13 +24,18 @@ import { useEditor } from "@/hooks/use-editor";
 import { DEFAULT_COLOR } from "@/constants/project-constants";
 import { MIN_FONT_SIZE, MAX_FONT_SIZE } from "@/constants/text-constants";
 
-export function TextProperties({
-	element,
-	trackId,
-}: {
+interface TextElementRef {
 	element: TextElement;
 	trackId: string;
+}
+
+export function TextProperties({
+	elements: elementRefs,
+}: {
+	elements: TextElementRef[];
 }) {
+	const element = elementRefs[0].element;
+
 	const { t } = useTranslation();
 	const editor = useEditor();
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +54,15 @@ export function TextProperties({
 	const posYDraft = useRef("");
 	const scaleDraft = useRef("");
 	const rotationDraft = useRef("");
+
+	const buildBatchUpdates = (
+		updates: Partial<Record<string, unknown>>,
+	) =>
+		elementRefs.map((ref) => ({
+			trackId: ref.trackId,
+			elementId: ref.element.id,
+			updates,
+		}));
 
 	const fontSizeDisplay = isEditingFontSize.current
 		? fontSizeDraft.current
@@ -90,22 +104,20 @@ export function TextProperties({
 		: Math.round(element.transform.rotate).toString();
 
 	const updateTransform = ({
-		updates,
+		updates: transformUpdates,
 		pushHistory = true,
 	}: {
 		updates: Partial<Transform>;
 		pushHistory?: boolean;
 	}) => {
 		editor.timeline.updateElements({
-			updates: [
-				{
-					trackId,
-					elementId: element.id,
-					updates: {
-						transform: { ...element.transform, ...updates },
-					},
+			updates: elementRefs.map((ref) => ({
+				trackId: ref.trackId,
+				elementId: ref.element.id,
+				updates: {
+					transform: { ...ref.element.transform, ...transformUpdates },
 				},
-			],
+			})),
 			pushHistory,
 		});
 	};
@@ -123,7 +135,7 @@ export function TextProperties({
 		pushHistory?: boolean;
 	}) => {
 		editor.timeline.updateElements({
-			updates: [{ trackId, elementId: element.id, updates: { stroke } }],
+			updates: buildBatchUpdates({ stroke }),
 			pushHistory,
 		});
 	};
@@ -136,7 +148,7 @@ export function TextProperties({
 		pushHistory?: boolean;
 	}) => {
 		editor.timeline.updateElements({
-			updates: [{ trackId, elementId: element.id, updates: { shadow } }],
+			updates: buildBatchUpdates({ shadow }),
 			pushHistory,
 		});
 	};
@@ -154,7 +166,7 @@ export function TextProperties({
 				? element.fontSize
 				: clamp({ value: parsed, min: MIN_FONT_SIZE, max: MAX_FONT_SIZE });
 			editor.timeline.updateElements({
-				updates: [{ trackId, elementId: element.id, updates: { fontSize } }],
+				updates: buildBatchUpdates({ fontSize }),
 				pushHistory: false,
 			});
 		}
@@ -167,17 +179,11 @@ export function TextProperties({
 				? element.fontSize
 				: clamp({ value: parsed, min: MIN_FONT_SIZE, max: MAX_FONT_SIZE });
 			editor.timeline.updateElements({
-				updates: [
-					{
-						trackId,
-						elementId: element.id,
-						updates: { fontSize: initialFontSizeRef.current },
-					},
-				],
+				updates: buildBatchUpdates({ fontSize: initialFontSizeRef.current }),
 				pushHistory: false,
 			});
 			editor.timeline.updateElements({
-				updates: [{ trackId, elementId: element.id, updates: { fontSize } }],
+				updates: buildBatchUpdates({ fontSize }),
 				pushHistory: true,
 			});
 			initialFontSizeRef.current = null;
@@ -200,13 +206,7 @@ export function TextProperties({
 				? Math.round(element.opacity * 100)
 				: clamp({ value: parsed, min: 0, max: 100 });
 			editor.timeline.updateElements({
-				updates: [
-					{
-						trackId,
-						elementId: element.id,
-						updates: { opacity: opacityPercent / 100 },
-					},
-				],
+				updates: buildBatchUpdates({ opacity: opacityPercent / 100 }),
 				pushHistory: false,
 			});
 		}
@@ -219,23 +219,11 @@ export function TextProperties({
 				? Math.round(element.opacity * 100)
 				: clamp({ value: parsed, min: 0, max: 100 });
 			editor.timeline.updateElements({
-				updates: [
-					{
-						trackId,
-						elementId: element.id,
-						updates: { opacity: initialOpacityRef.current },
-					},
-				],
+				updates: buildBatchUpdates({ opacity: initialOpacityRef.current }),
 				pushHistory: false,
 			});
 			editor.timeline.updateElements({
-				updates: [
-					{
-						trackId,
-						elementId: element.id,
-						updates: { opacity: opacityPercent / 100 },
-					},
-				],
+				updates: buildBatchUpdates({ opacity: opacityPercent / 100 }),
 				pushHistory: true,
 			});
 			initialOpacityRef.current = null;
@@ -254,24 +242,12 @@ export function TextProperties({
 		}
 		if (initialBgColorRef.current !== null) {
 			editor.timeline.updateElements({
-				updates: [
-					{
-						trackId,
-						elementId: element.id,
-						updates: { backgroundColor: color },
-					},
-				],
+				updates: buildBatchUpdates({ backgroundColor: color }),
 				pushHistory: false,
 			});
 		} else {
 			editor.timeline.updateElements({
-				updates: [
-					{
-						trackId,
-						elementId: element.id,
-						updates: { backgroundColor: color },
-					},
-				],
+				updates: buildBatchUpdates({ backgroundColor: color }),
 			});
 		}
 	};
@@ -279,23 +255,13 @@ export function TextProperties({
 	const handleColorChangeEnd = ({ color }: { color: string }) => {
 		if (initialBgColorRef.current !== null) {
 			editor.timeline.updateElements({
-				updates: [
-					{
-						trackId,
-						elementId: element.id,
-						updates: { backgroundColor: initialBgColorRef.current },
-					},
-				],
+				updates: buildBatchUpdates({
+					backgroundColor: initialBgColorRef.current,
+				}),
 				pushHistory: false,
 			});
 			editor.timeline.updateElements({
-				updates: [
-					{
-						trackId,
-						elementId: element.id,
-						updates: { backgroundColor: `#${color}` },
-					},
-				],
+				updates: buildBatchUpdates({ backgroundColor: `#${color}` }),
 				pushHistory: true,
 			});
 			initialBgColorRef.current = null;
@@ -323,13 +289,9 @@ export function TextProperties({
 								initialContentRef.current = element.content;
 							}
 							editor.timeline.updateElements({
-								updates: [
-									{
-										trackId,
-										elementId: element.id,
-										updates: { content: event.target.value },
-									},
-								],
+								updates: buildBatchUpdates({
+									content: event.target.value,
+								}),
 								pushHistory: false,
 							});
 						}}
@@ -337,23 +299,15 @@ export function TextProperties({
 							if (initialContentRef.current !== null) {
 								const finalContent = contentDraft.current;
 								editor.timeline.updateElements({
-									updates: [
-										{
-											trackId,
-											elementId: element.id,
-											updates: { content: initialContentRef.current },
-										},
-									],
+									updates: buildBatchUpdates({
+										content: initialContentRef.current,
+									}),
 									pushHistory: false,
 								});
 								editor.timeline.updateElements({
-									updates: [
-										{
-											trackId,
-											elementId: element.id,
-											updates: { content: finalContent },
-										},
-									],
+									updates: buildBatchUpdates({
+										content: finalContent,
+									}),
 									pushHistory: true,
 								});
 								initialContentRef.current = null;
@@ -373,13 +327,9 @@ export function TextProperties({
 									defaultValue={element.fontFamily}
 									onValueChange={(value: FontFamily) =>
 										editor.timeline.updateElements({
-											updates: [
-												{
-													trackId,
-													elementId: element.id,
-													updates: { fontFamily: value },
-												},
-											],
+											updates: buildBatchUpdates({
+												fontFamily: value,
+											}),
 										})
 									}
 								/>
@@ -396,18 +346,12 @@ export function TextProperties({
 										size="sm"
 										onClick={() =>
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: {
-															fontWeight:
-																element.fontWeight === "bold"
-																	? "normal"
-																	: "bold",
-														},
-													},
-												],
+												updates: buildBatchUpdates({
+													fontWeight:
+														element.fontWeight === "bold"
+															? "normal"
+															: "bold",
+												}),
 											})
 										}
 										className="h-8 px-3 font-bold"
@@ -421,18 +365,12 @@ export function TextProperties({
 										size="sm"
 										onClick={() =>
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: {
-															fontStyle:
-																element.fontStyle === "italic"
-																	? "normal"
-																	: "italic",
-														},
-													},
-												],
+												updates: buildBatchUpdates({
+													fontStyle:
+														element.fontStyle === "italic"
+															? "normal"
+															: "italic",
+												}),
 											})
 										}
 										className="h-8 px-3 italic"
@@ -448,18 +386,12 @@ export function TextProperties({
 										size="sm"
 										onClick={() =>
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: {
-															textDecoration:
-																element.textDecoration === "underline"
-																	? "none"
-																	: "underline",
-														},
-													},
-												],
+												updates: buildBatchUpdates({
+													textDecoration:
+														element.textDecoration === "underline"
+															? "none"
+															: "underline",
+												}),
 											})
 										}
 										className="h-8 px-3 underline"
@@ -475,18 +407,12 @@ export function TextProperties({
 										size="sm"
 										onClick={() =>
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: {
-															textDecoration:
-																element.textDecoration === "line-through"
-																	? "none"
-																	: "line-through",
-														},
-													},
-												],
+												updates: buildBatchUpdates({
+													textDecoration:
+														element.textDecoration === "line-through"
+															? "none"
+															: "line-through",
+												}),
 											})
 										}
 										className="h-8 px-3 line-through"
@@ -510,38 +436,20 @@ export function TextProperties({
 												initialFontSizeRef.current = element.fontSize;
 											}
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: { fontSize: value },
-													},
-												],
+												updates: buildBatchUpdates({ fontSize: value }),
 												pushHistory: false,
 											});
 										}}
 										onValueCommit={([value]) => {
 											if (initialFontSizeRef.current !== null) {
 												editor.timeline.updateElements({
-													updates: [
-														{
-															trackId,
-															elementId: element.id,
-															updates: {
-																fontSize: initialFontSizeRef.current,
-															},
-														},
-													],
+													updates: buildBatchUpdates({
+														fontSize: initialFontSizeRef.current,
+													}),
 													pushHistory: false,
 												});
 												editor.timeline.updateElements({
-													updates: [
-														{
-															trackId,
-															elementId: element.id,
-															updates: { fontSize: value },
-														},
-													],
+													updates: buildBatchUpdates({ fontSize: value }),
 													pushHistory: true,
 												});
 												initialFontSizeRef.current = null;
@@ -585,47 +493,31 @@ export function TextProperties({
 										}
 										if (initialColorRef.current !== null) {
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: { color: `#${color}` },
-													},
-												],
+												updates: buildBatchUpdates({
+													color: `#${color}`,
+												}),
 												pushHistory: false,
 											});
 										} else {
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: { color: `#${color}` },
-													},
-												],
+												updates: buildBatchUpdates({
+													color: `#${color}`,
+												}),
 											});
 										}
 									}}
 									onChangeEnd={(color) => {
 										if (initialColorRef.current !== null) {
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: { color: initialColorRef.current },
-													},
-												],
+												updates: buildBatchUpdates({
+													color: initialColorRef.current,
+												}),
 												pushHistory: false,
 											});
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: { color: `#${color}` },
-													},
-												],
+												updates: buildBatchUpdates({
+													color: `#${color}`,
+												}),
 												pushHistory: true,
 											});
 											initialColorRef.current = null;
@@ -649,36 +541,24 @@ export function TextProperties({
 												initialOpacityRef.current = element.opacity;
 											}
 											editor.timeline.updateElements({
-												updates: [
-													{
-														trackId,
-														elementId: element.id,
-														updates: { opacity: value / 100 },
-													},
-												],
+												updates: buildBatchUpdates({
+													opacity: value / 100,
+												}),
 												pushHistory: false,
 											});
 										}}
 										onValueCommit={([value]) => {
 											if (initialOpacityRef.current !== null) {
 												editor.timeline.updateElements({
-													updates: [
-														{
-															trackId,
-															elementId: element.id,
-															updates: { opacity: initialOpacityRef.current },
-														},
-													],
+													updates: buildBatchUpdates({
+														opacity: initialOpacityRef.current,
+													}),
 													pushHistory: false,
 												});
 												editor.timeline.updateElements({
-													updates: [
-														{
-															trackId,
-															elementId: element.id,
-															updates: { opacity: value / 100 },
-														},
-													],
+													updates: buildBatchUpdates({
+														opacity: value / 100,
+													}),
 													pushHistory: true,
 												});
 												initialOpacityRef.current = null;

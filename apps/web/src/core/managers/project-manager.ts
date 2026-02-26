@@ -123,8 +123,6 @@ export class ProjectManager {
 
 		this.editor.save.pause();
 		await this.ensureStorageMigrations();
-		this.editor.media.clearAllAssets();
-		this.editor.scenes.clearScenes();
 
 		try {
 			const result = await storageService.loadProject({ id });
@@ -133,6 +131,9 @@ export class ProjectManager {
 			}
 
 			const project = result.project;
+
+			this.editor.media.clearAllAssets();
+			this.editor.scenes.clearScenes();
 
 			this.active = project;
 			this.notify();

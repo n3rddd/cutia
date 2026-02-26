@@ -18,12 +18,17 @@ import { LanguageToggle } from "../language-toggle";
 import { DEFAULT_LOGO_URL } from "@/constants/site-constants";
 import { toast } from "sonner";
 import { useEditor } from "@/hooks/use-editor";
-import { ArrowLeft02Icon, CommandIcon } from "@hugeicons/core-free-icons";
+import {
+	ArrowLeft02Icon,
+	CommandIcon,
+	SparklesIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ShortcutsDialog } from "./dialogs/shortcuts-dialog";
 import Image from "next/image";
 import { cn } from "@/utils/ui";
 import { useTranslation } from "@i18next-toolkit/react";
+import { useAgentStore } from "@/stores/agent-store";
 
 export function EditorHeader() {
 	return (
@@ -33,9 +38,10 @@ export function EditorHeader() {
 				<EditableProjectName />
 			</div>
 			<nav className="flex items-center gap-2">
-				<ExportButton />
 				<LanguageToggle />
 				<ThemeToggle />
+				<AgentToggle />
+				<ExportButton />
 			</nav>
 		</header>
 	);
@@ -127,7 +133,7 @@ function ProjectDropdown() {
 						disabled={isExiting}
 					>
 						<HugeiconsIcon icon={ArrowLeft02Icon} className="size-4" />
-						{t('Exit project')}
+						{t("Exit project")}
 					</DropdownMenuItem>
 
 					<DropdownMenuSeparator />
@@ -136,7 +142,7 @@ function ProjectDropdown() {
 						onClick={() => setOpenDialog("shortcuts")}
 					>
 						<HugeiconsIcon icon={CommandIcon} className="size-4" />
-						{t('Keyboard shortcuts')}
+						{t("Keyboard shortcuts")}
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
@@ -234,5 +240,23 @@ function EditableProjectName() {
 				isEditing && "ring-1 ring-ring cursor-text hover:bg-transparent",
 			)}
 		/>
+	);
+}
+
+function AgentToggle() {
+	const { t } = useTranslation();
+	const isOpen = useAgentStore((s) => s.isOpen);
+	const togglePanel = useAgentStore((s) => s.togglePanel);
+
+	return (
+		<Button
+			variant={isOpen ? "secondary" : "ghost"}
+			size="icon"
+			onClick={togglePanel}
+			title={t("AI Agent")}
+			className="size-8"
+		>
+			<HugeiconsIcon icon={SparklesIcon} className="size-4" />
+		</Button>
 	);
 }
