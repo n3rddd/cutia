@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { TIMELINE_CONSTANTS } from "@/constants/timeline-constants";
 import { useTimelinePlayhead } from "@/hooks/timeline/use-timeline-playhead";
 import { useEditor } from "@/hooks/use-editor";
@@ -10,7 +10,7 @@ interface TimelinePlayheadProps {
 	rulerRef: React.RefObject<HTMLDivElement | null>;
 	rulerScrollRef: React.RefObject<HTMLDivElement | null>;
 	tracksScrollRef: React.RefObject<HTMLDivElement | null>;
-	timelineRef: React.RefObject<HTMLDivElement | null>;
+	containerRef: React.RefObject<HTMLDivElement | null>;
 	playheadRef?: React.RefObject<HTMLDivElement | null>;
 	isSnappingToPlayhead?: boolean;
 }
@@ -20,7 +20,7 @@ export function TimelinePlayhead({
 	rulerRef,
 	rulerScrollRef,
 	tracksScrollRef,
-	timelineRef,
+	containerRef,
 	playheadRef: externalPlayheadRef,
 	isSnappingToPlayhead = false,
 }: TimelinePlayheadProps) {
@@ -37,15 +37,27 @@ export function TimelinePlayhead({
 		playheadRef,
 	});
 
-	const timelineContainerHeight =
-		tracksScrollRef.current?.clientHeight ??
-		timelineRef.current?.clientHeight ??
-		400;
-	const totalHeight = Math.max(0, timelineContainerHeight - 4);
+	useEffect(() => {
+		const scrollContainer = tracksScrollRef.current;
+		const playheadElement = playheadRef.current;
+		if (!scrollContainer || !playheadElement) return;
+
+		const syncScrollOffset = () => {
+			playheadElement.style.transform = `translateX(${-scrollContainer.scrollLeft}px)`;
+		};
+
+		syncScrollOffset();
+		scrollContainer.addEventListener("scroll", syncScrollOffset, {
+			passive: true,
+		});
+		return () =>
+			scrollContainer.removeEventListener("scroll", syncScrollOffset);
+	}, [tracksScrollRef, playheadRef]);
+
+	const totalHeight = containerRef.current?.clientHeight ?? 400;
 
 	const timelinePosition =
 		playheadPosition * TIMELINE_CONSTANTS.PIXELS_PER_SECOND * zoomLevel;
-	const leftPosition = timelinePosition;
 
 	const handlePlayheadKeyDown = (
 		event: React.KeyboardEvent<HTMLDivElement>,
@@ -72,9 +84,9 @@ export function TimelinePlayhead({
 			aria-valuemax={duration}
 			aria-valuenow={playheadPosition}
 			tabIndex={0}
-			className="pointer-events-auto absolute z-60"
+			className="pointer-events-auto absolute z-60 will-change-transform"
 			style={{
-				left: `${leftPosition}px`,
+				left: `${timelinePosition}px`,
 				top: 0,
 				height: `${totalHeight}px`,
 				width: "2px",

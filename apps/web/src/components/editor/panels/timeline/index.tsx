@@ -318,6 +318,17 @@ export function Timeline() {
 							isVisible={dragState.isDragging}
 							headerHeight={timelineHeaderHeight}
 						/>
+						<TimelinePlayhead
+							zoomLevel={zoomLevel}
+							rulerRef={rulerRef}
+							rulerScrollRef={tracksScrollRef}
+							tracksScrollRef={tracksScrollRef}
+							containerRef={tracksContainerRef}
+							playheadRef={playheadRef}
+							isSnappingToPlayhead={
+								showSnapIndicator && currentSnapPoint?.type === "playhead"
+							}
+						/>
 						<ScrollArea
 							className="size-full"
 							ref={tracksScrollRef}
@@ -376,17 +387,6 @@ export function Timeline() {
 										handleRulerMouseDown={handlePlayheadRulerMouseDown}
 									/>
 								</div>
-								<TimelinePlayhead
-									zoomLevel={zoomLevel}
-									rulerRef={rulerRef}
-									rulerScrollRef={tracksScrollRef}
-									tracksScrollRef={tracksScrollRef}
-									timelineRef={timelineRef}
-									playheadRef={playheadRef}
-									isSnappingToPlayhead={
-										showSnapIndicator && currentSnapPoint?.type === "playhead"
-									}
-								/>
 								<div
 									className="relative"
 									style={{
