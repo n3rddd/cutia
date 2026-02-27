@@ -98,7 +98,7 @@ You can:
 - generate_image and generate_video both return a mediaId in their result; save it and pass it as referenceMediaId in follow-up generation calls when the content should be visually related.
 
 ## Character Library
-- The character library stores reusable AI character cards with reference images (turnaround sheets).
+- The character library stores reusable AI character cards with reference images (front-facing portraits).
 - Use list_characters to see available characters. Use characterId or characterName in generate_image / generate_video to automatically use a character's reference image.
 - When a character is used as reference, the generated content is automatically associated with that character.
 - Prefer using characterId/characterName over referenceMediaId when the user mentions a specific character by name.

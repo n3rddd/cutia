@@ -299,7 +299,7 @@ function EmptyState({
 				</h3>
 				<p className="text-muted-foreground max-w-md">
 					{t(
-						"Create AI character cards with turnaround sheets. Use them as reference images for consistent AI generation.",
+						"Create AI character cards with front-facing portraits. Use them as reference images for consistent AI generation.",
 					)}
 				</p>
 			</div>

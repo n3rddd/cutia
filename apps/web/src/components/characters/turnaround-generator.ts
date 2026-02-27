@@ -1,18 +1,18 @@
 import { getImageProvider } from "@/lib/ai/providers";
 import { useAISettingsStore } from "@/stores/ai-settings-store";
 
-const TURNAROUND_PROMPT_PREFIX =
-	"character turnaround sheet, front view, side view, back view, full body, white background, consistent character design";
+const CHARACTER_PORTRAIT_PROMPT_PREFIX =
+	"character portrait, front facing view, full body from head to feet, nothing cropped, arms relaxed at sides, hands naturally hanging down, white background, clean design, high quality";
 
-export function buildTurnaroundPrompt({
+export function buildCharacterPortraitPrompt({
 	description,
 }: {
 	description: string;
 }): string {
-	return `${TURNAROUND_PROMPT_PREFIX}, ${description}`;
+	return `${CHARACTER_PORTRAIT_PROMPT_PREFIX}, ${description}`;
 }
 
-export async function generateTurnaroundSheet({
+export async function generateCharacterPortrait({
 	description,
 }: {
 	description: string;
@@ -30,10 +30,10 @@ export async function generateTurnaroundSheet({
 		throw new Error(`Image provider '${imageProviderId}' not found`);
 	}
 
-	const prompt = buildTurnaroundPrompt({ description });
+	const prompt = buildCharacterPortraitPrompt({ description });
 
 	const results = await provider.generateImage({
-		request: { prompt, aspectRatio: "16:9" },
+		request: { prompt, aspectRatio: "9:16" },
 		apiKey: imageApiKey,
 	});
 

@@ -124,9 +124,7 @@ export const useAIVideoGenerationStore = create<AIVideoGenerationState>()(
 		setSelectedCharacterId: (id) => {
 			set({ selectedCharacterId: id });
 			if (id) {
-				const character = useCharacterStore
-					.getState()
-					.getCharacterById({ id });
+				const character = useCharacterStore.getState().getCharacterById({ id });
 				if (character && character.images.length > 0) {
 					const firstImage = character.images[0];
 					void getCharacterImageBlob({ id: firstImage.blobKey }).then(
@@ -134,15 +132,12 @@ export const useAIVideoGenerationStore = create<AIVideoGenerationState>()(
 							if (blob) {
 								const prev = get().referenceImagePreview;
 								if (prev) URL.revokeObjectURL(prev);
-								const file = new File(
-									[blob],
-									`character-${id}.png`,
-									{ type: blob.type || "image/png" },
-								);
+								const file = new File([blob], `character-${id}.png`, {
+									type: blob.type || "image/png",
+								});
 								set({
 									referenceImage: file,
-									referenceImagePreview:
-										URL.createObjectURL(blob),
+									referenceImagePreview: URL.createObjectURL(blob),
 								});
 							}
 						},
@@ -159,7 +154,10 @@ export const useAIVideoGenerationStore = create<AIVideoGenerationState>()(
 			if (prev) URL.revokeObjectURL(prev);
 
 			if (file) {
-				set({ referenceImage: file, referenceImagePreview: URL.createObjectURL(file) });
+				set({
+					referenceImage: file,
+					referenceImagePreview: URL.createObjectURL(file),
+				});
 			} else {
 				set({ referenceImage: null, referenceImagePreview: null });
 			}
@@ -168,25 +166,27 @@ export const useAIVideoGenerationStore = create<AIVideoGenerationState>()(
 		generate: async () => {
 			if (get().isGenerating) return;
 
-			const { videoProviderId, videoApiKey } =
-				useAISettingsStore.getState();
+			const { videoProviderId, videoApiKey } = useAISettingsStore.getState();
 
 			if (!videoProviderId) {
-				toast.error(
-					i18next.t("Please configure a video provider in Settings"),
-				);
+				toast.error(i18next.t("Please configure a video provider in Settings"));
 				return;
 			}
 
 			const provider = getVideoProvider({ id: videoProviderId });
 			if (!provider || !videoApiKey) {
-				toast.error(
-					i18next.t("Please configure a video provider in Settings"),
-				);
+				toast.error(i18next.t("Please configure a video provider in Settings"));
 				return;
 			}
 
-			const { prompt, duration, aspectRatio, resolution, referenceImage, selectedCharacterId } = get();
+			const {
+				prompt,
+				duration,
+				aspectRatio,
+				resolution,
+				referenceImage,
+				selectedCharacterId,
+			} = get();
 			const trimmedPrompt = prompt.trim();
 			if (!trimmedPrompt) {
 				toast.error(i18next.t("Please enter a prompt"));
@@ -202,7 +202,9 @@ export const useAIVideoGenerationStore = create<AIVideoGenerationState>()(
 						characterId: selectedCharacterId,
 					});
 				} else if (referenceImage) {
-					referenceImageUrl = await uploadReferenceImage({ file: referenceImage });
+					referenceImageUrl = await uploadReferenceImage({
+						file: referenceImage,
+					});
 				}
 
 				const submitResult = await provider.submitVideoTask({
@@ -297,47 +299,45 @@ async function pollAndUpdate({
 			},
 		});
 
-	if (finalResult.status === "succeeded" && finalResult.videoUrl) {
-		const currentVideo = useAIVideoGenerationStore
-			.getState()
-			.generatedVideos.find((v) => v.id === videoId);
+		if (finalResult.status === "succeeded" && finalResult.videoUrl) {
+			const currentVideo = useAIVideoGenerationStore
+				.getState()
+				.generatedVideos.find((v) => v.id === videoId);
 
-		updateVideo({
-			videoId,
-			updates: {
-				taskStatus: "succeeded",
-				videoUrl: finalResult.videoUrl,
-			},
-		});
+			updateVideo({
+				videoId,
+				updates: {
+					taskStatus: "succeeded",
+					videoUrl: finalResult.videoUrl,
+				},
+			});
 
-		toast.success(i18next.t("Video generation completed"));
+			toast.success(i18next.t("Video generation completed"));
 
-		useAIGenerationHistoryStore.getState().addEntry({
-			id: generateUUID(),
-			type: "video",
-			prompt: currentVideo?.prompt ?? "",
-			url: finalResult.videoUrl,
-			provider: provider?.name ?? "",
-		});
-
-		void downloadAndAddToAssets({
-			videoId,
-			videoUrl: finalResult.videoUrl,
-		});
-
-		if (characterId) {
-			const generation: CharacterGeneration = {
+			useAIGenerationHistoryStore.getState().addEntry({
 				id: generateUUID(),
 				type: "video",
 				prompt: currentVideo?.prompt ?? "",
 				url: finalResult.videoUrl,
 				provider: provider?.name ?? "",
-				createdAt: new Date().toISOString(),
-			};
-			useCharacterStore
-				.getState()
-				.addGeneration({ characterId, generation });
-		}
+			});
+
+			void downloadAndAddToAssets({
+				videoId,
+				videoUrl: finalResult.videoUrl,
+			});
+
+			if (characterId) {
+				const generation: CharacterGeneration = {
+					id: generateUUID(),
+					type: "video",
+					prompt: currentVideo?.prompt ?? "",
+					url: finalResult.videoUrl,
+					provider: provider?.name ?? "",
+					createdAt: new Date().toISOString(),
+				};
+				useCharacterStore.getState().addGeneration({ characterId, generation });
+			}
 		} else if (finalResult.status === "failed") {
 			updateVideo({
 				videoId,
@@ -346,9 +346,7 @@ async function pollAndUpdate({
 					error: finalResult.error ?? i18next.t("Video generation failed"),
 				},
 			});
-			toast.error(
-				finalResult.error ?? i18next.t("Video generation failed"),
-			);
+			toast.error(finalResult.error ?? i18next.t("Video generation failed"));
 		}
 	} catch (error) {
 		const message =

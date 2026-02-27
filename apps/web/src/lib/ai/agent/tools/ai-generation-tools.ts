@@ -266,12 +266,10 @@ export const generateImageTool: AgentTool = {
 						mediaId: added.mediaId,
 						createdAt: new Date().toISOString(),
 					};
-					useCharacterStore
-						.getState()
-						.addGeneration({
-							characterId: resolvedCharacterId,
-							generation,
-						});
+					useCharacterStore.getState().addGeneration({
+						characterId: resolvedCharacterId,
+						generation,
+					});
 				}
 			}
 
@@ -293,9 +291,7 @@ export const generateImageTool: AgentTool = {
 			return {
 				success: false,
 				message:
-					error instanceof Error
-						? error.message
-						: "Image generation failed",
+					error instanceof Error ? error.message : "Image generation failed",
 			};
 		}
 	},
@@ -380,7 +376,13 @@ export const generateVideoTool: AgentTool = {
 			}
 
 			const submitResult = await provider.submitVideoTask({
-				request: { prompt, duration, aspectRatio, resolution, referenceImageUrl },
+				request: {
+					prompt,
+					duration,
+					aspectRatio,
+					resolution,
+					referenceImageUrl,
+				},
 				apiKey,
 			});
 
@@ -431,12 +433,10 @@ export const generateVideoTool: AgentTool = {
 					mediaId: added.mediaId,
 					createdAt: new Date().toISOString(),
 				};
-				useCharacterStore
-					.getState()
-					.addGeneration({
-						characterId: resolvedCharacterId,
-						generation,
-					});
+				useCharacterStore.getState().addGeneration({
+					characterId: resolvedCharacterId,
+					generation,
+				});
 			}
 
 			return {
@@ -455,9 +455,7 @@ export const generateVideoTool: AgentTool = {
 			return {
 				success: false,
 				message:
-					error instanceof Error
-						? error.message
-						: "Video generation failed",
+					error instanceof Error ? error.message : "Video generation failed",
 			};
 		}
 	},

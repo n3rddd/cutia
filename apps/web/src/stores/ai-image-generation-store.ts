@@ -89,25 +89,18 @@ function externalUrlToBlob({ url }: { url: string }): Promise<Blob> {
 					return;
 				}
 				context.drawImage(image, 0, 0);
-				canvas.toBlob(
-					(blob) => {
-						image.remove();
-						if (blob) {
-							resolve(blob);
-						} else {
-							reject(
-								new Error("Failed to convert image to blob"),
-							);
-						}
-					},
-					"image/png",
-				);
+				canvas.toBlob((blob) => {
+					image.remove();
+					if (blob) {
+						resolve(blob);
+					} else {
+						reject(new Error("Failed to convert image to blob"));
+					}
+				}, "image/png");
 			} catch (error) {
 				image.remove();
 				reject(
-					error instanceof Error
-						? error
-						: new Error("Failed to process image"),
+					error instanceof Error ? error : new Error("Failed to process image"),
 				);
 			}
 		});
@@ -229,9 +222,7 @@ export const useAIImageGenerationStore = create<AIImageGenerationState>()(
 		setSelectedCharacterId: (id) => {
 			set({ selectedCharacterId: id });
 			if (id) {
-				const character = useCharacterStore
-					.getState()
-					.getCharacterById({ id });
+				const character = useCharacterStore.getState().getCharacterById({ id });
 				if (character && character.images.length > 0) {
 					const firstImage = character.images[0];
 					void getCharacterImageBlob({ id: firstImage.blobKey }).then(
@@ -239,15 +230,12 @@ export const useAIImageGenerationStore = create<AIImageGenerationState>()(
 							if (blob) {
 								const prev = get().referenceImagePreview;
 								if (prev) URL.revokeObjectURL(prev);
-								const file = new File(
-									[blob],
-									`character-${id}.png`,
-									{ type: blob.type || "image/png" },
-								);
+								const file = new File([blob], `character-${id}.png`, {
+									type: blob.type || "image/png",
+								});
 								set({
 									referenceImage: file,
-									referenceImagePreview:
-										URL.createObjectURL(blob),
+									referenceImagePreview: URL.createObjectURL(blob),
 								});
 							}
 						},
@@ -264,7 +252,10 @@ export const useAIImageGenerationStore = create<AIImageGenerationState>()(
 			if (prev) URL.revokeObjectURL(prev);
 
 			if (file) {
-				set({ referenceImage: file, referenceImagePreview: URL.createObjectURL(file) });
+				set({
+					referenceImage: file,
+					referenceImagePreview: URL.createObjectURL(file),
+				});
 			} else {
 				set({ referenceImage: null, referenceImagePreview: null });
 			}
@@ -273,21 +264,25 @@ export const useAIImageGenerationStore = create<AIImageGenerationState>()(
 		generate: async () => {
 			if (get().isGenerating) return;
 
-			const { imageProviderId, imageApiKey } =
-				useAISettingsStore.getState();
+			const { imageProviderId, imageApiKey } = useAISettingsStore.getState();
 
 			if (!imageProviderId) {
-				toast.error(i18next.t("Please configure an image provider in Settings"));
+				toast.error(
+					i18next.t("Please configure an image provider in Settings"),
+				);
 				return;
 			}
 
 			const provider = getImageProvider({ id: imageProviderId });
 			if (!provider || !imageApiKey) {
-				toast.error(i18next.t("Please configure an image provider in Settings"));
+				toast.error(
+					i18next.t("Please configure an image provider in Settings"),
+				);
 				return;
 			}
 
-			const { prompt, aspectRatio, referenceImage, selectedCharacterId } = get();
+			const { prompt, aspectRatio, referenceImage, selectedCharacterId } =
+				get();
 			const trimmedPrompt = prompt.trim();
 			if (!trimmedPrompt) {
 				toast.error(i18next.t("Please enter a prompt"));
@@ -303,14 +298,15 @@ export const useAIImageGenerationStore = create<AIImageGenerationState>()(
 						characterId: selectedCharacterId,
 					});
 				} else if (referenceImage) {
-					referenceImageUrl = await uploadReferenceImage({ file: referenceImage });
+					referenceImageUrl = await uploadReferenceImage({
+						file: referenceImage,
+					});
 				}
 
 				const results = await provider.generateImage({
 					request: {
 						prompt: trimmedPrompt,
-						aspectRatio:
-							aspectRatio === "auto" ? undefined : aspectRatio,
+						aspectRatio: aspectRatio === "auto" ? undefined : aspectRatio,
 						referenceImageUrl,
 					},
 					apiKey: imageApiKey,
@@ -328,40 +324,38 @@ export const useAIImageGenerationStore = create<AIImageGenerationState>()(
 					isGenerating: false,
 				}));
 
-			toast.success(
-				i18next.t("Generated {{num}} image(s)", {
-					num: results.length,
-				}),
-			);
+				toast.success(
+					i18next.t("Generated {{num}} image(s)", {
+						num: results.length,
+					}),
+				);
 
-			for (const image of newImages) {
-				void addImageToHistory({
-					imageUrl: image.url,
-					prompt: trimmedPrompt,
-					providerName: provider.name,
-				});
-				void convertAndAddToAssets({
-					imageId: image.id,
-					imageUrl: image.url,
-				});
-
-				if (selectedCharacterId) {
-					const generation: CharacterGeneration = {
-						id: generateUUID(),
-						type: "image",
+				for (const image of newImages) {
+					void addImageToHistory({
+						imageUrl: image.url,
 						prompt: trimmedPrompt,
-						url: image.url,
-						provider: provider.name,
-						createdAt: new Date().toISOString(),
-					};
-					useCharacterStore
-						.getState()
-						.addGeneration({
+						providerName: provider.name,
+					});
+					void convertAndAddToAssets({
+						imageId: image.id,
+						imageUrl: image.url,
+					});
+
+					if (selectedCharacterId) {
+						const generation: CharacterGeneration = {
+							id: generateUUID(),
+							type: "image",
+							prompt: trimmedPrompt,
+							url: image.url,
+							provider: provider.name,
+							createdAt: new Date().toISOString(),
+						};
+						useCharacterStore.getState().addGeneration({
 							characterId: selectedCharacterId,
 							generation,
 						});
+					}
 				}
-			}
 			} catch (error) {
 				const message =
 					error instanceof Error
@@ -373,9 +367,7 @@ export const useAIImageGenerationStore = create<AIImageGenerationState>()(
 		},
 
 		retryAddToAssets: (imageId) => {
-			const image = get().generatedImages.find(
-				(img) => img.id === imageId,
-			);
+			const image = get().generatedImages.find((img) => img.id === imageId);
 			if (image) {
 				void convertAndAddToAssets({
 					imageId: image.id,

@@ -20,7 +20,7 @@ import {
 	storeCharacterImageBlob,
 	createImageThumbnailDataUrl,
 } from "@/stores/character-store";
-import { generateTurnaroundSheet } from "./turnaround-generator";
+import { generateCharacterPortrait } from "./turnaround-generator";
 import { generateUUID } from "@/utils/id";
 import { useAISettingsStore } from "@/stores/ai-settings-store";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -92,7 +92,7 @@ export function CharacterCreatorDialog({
 		}
 		setIsGenerating(true);
 		try {
-			const result = await generateTurnaroundSheet({
+			const result = await generateCharacterPortrait({
 				description: description.trim(),
 			});
 
@@ -108,7 +108,7 @@ export function CharacterCreatorDialog({
 			const imageId = generateUUID();
 			const characterImage: CharacterImage = {
 				id: imageId,
-				label: "Turnaround Sheet",
+				label: "Character Portrait",
 				prompt: description.trim(),
 				blobKey,
 				thumbnailDataUrl,
@@ -121,18 +121,18 @@ export function CharacterCreatorDialog({
 				{
 					id: imageId,
 					thumbnailDataUrl,
-					label: "Turnaround Sheet",
+					label: "Character Portrait",
 					blobKey,
 					isNew: true,
 				},
 			]);
 
-			toast.success(t("Turnaround sheet generated"));
+			toast.success(t("Character portrait generated"));
 		} catch (error) {
 			toast.error(
 				error instanceof Error
 					? error.message
-					: t("Failed to generate turnaround sheet"),
+					: t("Failed to generate character portrait"),
 			);
 		} finally {
 			setIsGenerating(false);
@@ -403,7 +403,7 @@ export function CharacterCreatorDialog({
 											icon={ImageAdd01Icon}
 											className="mr-1 size-4"
 										/>
-										{t("Generate Turnaround Sheet")}
+										{t("Generate Portrait")}
 									</>
 								)}
 							</Button>
@@ -428,7 +428,7 @@ export function CharacterCreatorDialog({
 						{!isProviderConfigured && (
 							<p className="text-muted-foreground text-xs">
 								{t(
-									"Configure an image provider in editor Settings to generate turnaround sheets.",
+									"Configure an image provider in editor Settings to generate character portraits.",
 								)}
 							</p>
 						)}
