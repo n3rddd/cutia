@@ -74,14 +74,14 @@ export function Captions() {
 			});
 
 			setProcessingStep(t("Preparing audio..."));
-			const { samples, sampleRate } = await decodeAudioToFloat32({
+			const { samples } = await decodeAudioToFloat32({
 				audioBlob,
+				targetSampleRate: 16000,
 			});
 
 			const result = await transcriptionService.transcribe({
 				audioData: samples,
-				sampleRate,
-				language: selectedLanguage === "auto" ? undefined : selectedLanguage,
+				language: selectedLanguage,
 				onProgress: handleProgress,
 			});
 

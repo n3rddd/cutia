@@ -43,6 +43,7 @@ import type {
 	TranscriptionProgress,
 	TranscriptionModelId,
 	TranscriptionLanguage,
+	TranscriptionChunk,
 	CaptionChunk,
 } from "@/types/transcription";
 
@@ -116,6 +117,11 @@ export function TranscriptionPlayground() {
 	const [error, setError] = useState<string | null>(null);
 	const [elapsedMs, setElapsedMs] = useState<number | null>(null);
 
+	const [streamingChunks, setStreamingChunks] = useState<
+		TranscriptionChunk[]
+	>([]);
+	const [streamingTps, setStreamingTps] = useState<number>(0);
+
 	const [isRecording, setIsRecording] = useState(false);
 	const [isRequestingMic, setIsRequestingMic] = useState(false);
 	const [recordingDuration, setRecordingDuration] = useState(0);
@@ -150,6 +156,8 @@ export function TranscriptionPlayground() {
 		setCaptionChunks([]);
 		setError(null);
 		setElapsedMs(null);
+		setStreamingChunks([]);
+		setStreamingTps(0);
 		setProgress({ status: "idle", progress: 0 });
 	}, []);
 
@@ -252,6 +260,8 @@ export function TranscriptionPlayground() {
 		setResult(null);
 		setCaptionChunks([]);
 		setElapsedMs(null);
+		setStreamingChunks([]);
+		setStreamingTps(0);
 
 		const startTime = performance.now();
 
@@ -259,16 +269,20 @@ export function TranscriptionPlayground() {
 			setProgress({ status: "loading-model", progress: 0 });
 
 			const blob = new Blob([selectedFile], { type: selectedFile.type });
-			const { samples, sampleRate } = await decodeAudioToFloat32({
+			const { samples } = await decodeAudioToFloat32({
 				audioBlob: blob,
+				targetSampleRate: 16000,
 			});
 
 			const transcriptionResult = await transcriptionService.transcribe({
 				audioData: samples,
-				sampleRate,
 				language,
 				modelId,
 				onProgress: setProgress,
+				onStreamingUpdate: ({ chunks, tps }) => {
+					setStreamingChunks(chunks);
+					setStreamingTps(tps);
+				},
 			});
 
 			const elapsed = performance.now() - startTime;
@@ -309,6 +323,11 @@ export function TranscriptionPlayground() {
 	const isProcessing =
 		progress.status === "loading-model" || progress.status === "transcribing";
 
+	const streamingText = streamingChunks
+		.map((chunk) => chunk.text)
+		.join("")
+		.trim();
+
 	return (
 		<div className="flex flex-col gap-6">
 			<Card>
@@ -316,7 +335,8 @@ export function TranscriptionPlayground() {
 					<CardTitle>Transcription Debugger</CardTitle>
 					<CardDescription>
 						Upload an audio/video file, configure the model, and inspect
-						transcription results with full segment detail.
+						transcription results with full segment detail. Uses WebGPU
+						acceleration with streaming output.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -474,6 +494,11 @@ export function TranscriptionPlayground() {
 											{progress.message}
 										</span>
 									)}
+									{streamingTps > 0 && (
+										<Badge variant="outline">
+											{streamingTps.toFixed(1)} tokens/s
+										</Badge>
+									)}
 								</div>
 								{elapsedMs !== null && (
 									<span className="text-muted-foreground text-sm">
@@ -481,7 +506,9 @@ export function TranscriptionPlayground() {
 									</span>
 								)}
 							</div>
-							<Progress value={progress.progress} />
+							{progress.status === "loading-model" && (
+								<Progress value={progress.progress} />
+							)}
 						</div>
 					</CardContent>
 				</Card>
@@ -495,12 +522,72 @@ export function TranscriptionPlayground() {
 				</Card>
 			)}
 
+			{streamingChunks.length > 0 && !result && (
+				<Card>
+					<CardHeader>
+						<CardTitle>Live Transcription</CardTitle>
+						<CardDescription>
+							{streamingChunks.length} chunks —{" "}
+							{streamingTps > 0
+								? `${streamingTps.toFixed(1)} tokens/s`
+								: "starting..."}
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<div className="bg-muted rounded-md p-4">
+							<p className="whitespace-pre-wrap text-sm">
+								{streamingText || "..."}
+							</p>
+						</div>
+						<div className="mt-4 max-h-[300px] overflow-auto">
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead className="w-12">#</TableHead>
+										<TableHead className="w-36">Start</TableHead>
+										<TableHead className="w-36">End</TableHead>
+										<TableHead className="w-20">Status</TableHead>
+										<TableHead>Text</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{streamingChunks.map((chunk, index) => (
+										<TableRow key={`streaming-${chunk.timestamp[0]}-${index}`}>
+											<TableCell className="text-muted-foreground font-mono text-xs">
+												{index + 1}
+											</TableCell>
+											<TableCell className="font-mono text-xs">
+												{formatTimestamp({ seconds: chunk.timestamp[0] })}
+											</TableCell>
+											<TableCell className="font-mono text-xs">
+												{chunk.timestamp[1] !== null
+													? formatTimestamp({ seconds: chunk.timestamp[1] })
+													: "—"}
+											</TableCell>
+											<TableCell>
+												<Badge
+													variant={chunk.finalised ? "default" : "secondary"}
+												>
+													{chunk.finalised ? "Done" : "Live"}
+												</Badge>
+											</TableCell>
+											<TableCell>{chunk.text}</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
+					</CardContent>
+				</Card>
+			)}
+
 			{result && (
 				<Card>
 					<CardHeader>
 						<CardTitle>Results</CardTitle>
 						<CardDescription>
 							{result.segments.length} segments — Language: {result.language}
+							{result.tps ? ` — ${result.tps.toFixed(1)} tokens/s` : ""}
 						</CardDescription>
 					</CardHeader>
 					<CardContent>
@@ -522,6 +609,11 @@ export function TranscriptionPlayground() {
 										<Badge variant="outline">
 											Segments: {result.segments.length}
 										</Badge>
+										{result.tps && (
+											<Badge variant="outline">
+												{result.tps.toFixed(1)} tokens/s
+											</Badge>
+										)}
 									</div>
 
 									<div className="bg-muted rounded-md p-4">

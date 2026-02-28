@@ -30,24 +30,34 @@ export interface DecodedAudio {
 
 export async function decodeAudioToFloat32({
 	audioBlob,
+	targetSampleRate,
 }: {
 	audioBlob: Blob;
+	targetSampleRate?: number;
 }): Promise<DecodedAudio> {
-	const audioContext = createAudioContext();
+	const audioContext = targetSampleRate
+		? new AudioContext({ sampleRate: targetSampleRate })
+		: createAudioContext();
 	const arrayBuffer = await audioBlob.arrayBuffer();
 	const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-	// mix down to mono
 	const numChannels = audioBuffer.numberOfChannels;
 	const length = audioBuffer.length;
 	const samples = new Float32Array(length);
 
-	for (let i = 0; i < length; i++) {
-		let sum = 0;
-		for (let channel = 0; channel < numChannels; channel++) {
-			sum += audioBuffer.getChannelData(channel)[i];
+	if (numChannels === 2) {
+		// stereo -> mono with power-preserving scaling
+		const SCALING_FACTOR = Math.sqrt(2);
+		const left = audioBuffer.getChannelData(0);
+		const right = audioBuffer.getChannelData(1);
+		for (let i = 0; i < length; i++) {
+			samples[i] = (SCALING_FACTOR * (left[i] + right[i])) / 2;
 		}
-		samples[i] = sum / numChannels;
+	} else {
+		const channel = audioBuffer.getChannelData(0);
+		for (let i = 0; i < length; i++) {
+			samples[i] = channel[i];
+		}
 	}
 
 	return { samples, sampleRate: audioBuffer.sampleRate };

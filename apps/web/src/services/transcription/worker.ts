@@ -1,33 +1,51 @@
 import {
 	pipeline,
+	WhisperTextStreamer,
 	type AutomaticSpeechRecognitionPipeline,
-	type AutomaticSpeechRecognitionOutput,
 } from "@huggingface/transformers";
-import type { TranscriptionSegment } from "@/types/transcription";
+import type {
+	TranscriptionSegment,
+	TranscriptionChunk,
+} from "@/types/transcription";
 import {
 	DEFAULT_CHUNK_LENGTH_SECONDS,
 	DEFAULT_STRIDE_SECONDS,
 } from "@/constants/transcription-constants";
 
 export type WorkerMessage =
-	| { type: "init"; modelId: string }
-	| { type: "transcribe"; audio: Float32Array; language: string }
+	| {
+			type: "init";
+			modelId: string;
+			encoderDtype: "fp16" | "fp32";
+	  }
+	| {
+			type: "transcribe";
+			audio: Float32Array;
+			language: string;
+			subtask: string | null;
+	  }
 	| { type: "cancel" };
 
 export type WorkerResponse =
 	| { type: "init-progress"; progress: number }
 	| { type: "init-complete" }
 	| { type: "init-error"; error: string }
-	| { type: "transcribe-progress"; progress: number }
+	| {
+			type: "transcribe-update";
+			chunks: TranscriptionChunk[];
+			tps: number;
+	  }
 	| {
 			type: "transcribe-complete";
 			text: string;
 			segments: TranscriptionSegment[];
+			tps: number;
 	  }
 	| { type: "transcribe-error"; error: string }
 	| { type: "cancelled" };
 
 let transcriber: AutomaticSpeechRecognitionPipeline | null = null;
+let currentModelId: string | null = null;
 let cancelled = false;
 let lastReportedProgress = -1;
 const fileBytes = new Map<string, { loaded: number; total: number }>();
@@ -37,12 +55,16 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 
 	switch (message.type) {
 		case "init":
-			await handleInit({ modelId: message.modelId });
+			await handleInit({
+				modelId: message.modelId,
+				encoderDtype: message.encoderDtype,
+			});
 			break;
 		case "transcribe":
 			await handleTranscribe({
 				audio: message.audio,
 				language: message.language,
+				subtask: message.subtask,
 			});
 			break;
 		case "cancel":
@@ -52,14 +74,34 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 	}
 };
 
-async function handleInit({ modelId }: { modelId: string }) {
+async function handleInit({
+	modelId,
+	encoderDtype,
+}: {
+	modelId: string;
+	encoderDtype: "fp16" | "fp32";
+}) {
+	if (transcriber && currentModelId === modelId) {
+		self.postMessage({ type: "init-complete" } satisfies WorkerResponse);
+		return;
+	}
+
+	if (transcriber) {
+		await transcriber.dispose();
+		transcriber = null;
+		currentModelId = null;
+	}
+
 	lastReportedProgress = -1;
 	fileBytes.clear();
 
 	try {
 		transcriber = (await pipeline("automatic-speech-recognition", modelId, {
-			dtype: "q4",
-			device: "auto",
+			dtype: {
+				encoder_model: encoderDtype,
+				decoder_model_merged: "q4",
+			},
+			device: "webgpu",
 			progress_callback: (progressInfo: {
 				status?: string;
 				file?: string;
@@ -84,7 +126,6 @@ async function handleInit({ modelId }: { modelId: string }) {
 					}
 				}
 
-				// sum all bytes
 				let totalLoaded = 0;
 				let totalSize = 0;
 				for (const { loaded, total } of fileBytes.values()) {
@@ -107,6 +148,7 @@ async function handleInit({ modelId }: { modelId: string }) {
 			},
 		})) as unknown as AutomaticSpeechRecognitionPipeline;
 
+		currentModelId = modelId;
 		self.postMessage({ type: "init-complete" } satisfies WorkerResponse);
 	} catch (error) {
 		self.postMessage({
@@ -119,9 +161,11 @@ async function handleInit({ modelId }: { modelId: string }) {
 async function handleTranscribe({
 	audio,
 	language,
+	subtask,
 }: {
 	audio: Float32Array;
 	language: string;
+	subtask: string | null;
 }) {
 	if (!transcriber) {
 		self.postMessage({
@@ -134,21 +178,93 @@ async function handleTranscribe({
 	cancelled = false;
 
 	try {
-		const rawResult = await transcriber(audio, {
-			chunk_length_s: DEFAULT_CHUNK_LENGTH_SECONDS,
-			stride_length_s: DEFAULT_STRIDE_SECONDS,
+		const featureExtractor = transcriber.processor
+			.feature_extractor as unknown as {
+			config: { chunk_length: number };
+		};
+		const modelConfig = transcriber.model.config as unknown as {
+			max_source_positions: number;
+		};
+		const timePrecision =
+			featureExtractor.config.chunk_length /
+			modelConfig.max_source_positions;
+
+		const chunks: TranscriptionChunk[] = [];
+		let chunkCount = 0;
+		let startTime: number | null = null;
+		let numTokens = 0;
+		let tps = 0;
+
+		const isDistilWhisper = currentModelId?.includes("distil") ?? false;
+		const chunkLengthS = isDistilWhisper ? 20 : DEFAULT_CHUNK_LENGTH_SECONDS;
+		const strideLengthS = isDistilWhisper ? 3 : DEFAULT_STRIDE_SECONDS;
+
+		const tokenizer = transcriber.tokenizer as Parameters<
+			typeof WhisperTextStreamer extends new (
+				tok: infer T,
+				...args: unknown[]
+			) => unknown
+				? T
+				: never
+		>;
+		const streamer = new WhisperTextStreamer(tokenizer, {
+			time_precision: timePrecision,
+			on_chunk_start: (x: number) => {
+				const offset = (chunkLengthS - strideLengthS) * chunkCount;
+				chunks.push({
+					text: "",
+					timestamp: [offset + x, null],
+					finalised: false,
+					offset,
+				});
+			},
+			token_callback_function: () => {
+				startTime ??= performance.now();
+				numTokens++;
+				if (numTokens > 1) {
+					tps = (numTokens / (performance.now() - startTime)) * 1000;
+				}
+			},
+			callback_function: (x: string) => {
+				if (chunks.length === 0) return;
+				const last = chunks[chunks.length - 1];
+				last.text += x;
+
+				self.postMessage({
+					type: "transcribe-update",
+					chunks: [...chunks],
+					tps,
+				} satisfies WorkerResponse);
+			},
+			on_chunk_end: (x: number) => {
+				const current = chunks[chunks.length - 1];
+				current.timestamp[1] = x + current.offset;
+				current.finalised = true;
+			},
+			on_finalize: () => {
+				startTime = null;
+				numTokens = 0;
+				chunkCount++;
+			},
+		});
+
+		const output = await transcriber(audio, {
+			top_k: 0,
+			do_sample: false,
+			chunk_length_s: chunkLengthS,
+			stride_length_s: strideLengthS,
 			language: language === "auto" ? undefined : language,
+			task: subtask ?? "transcribe",
 			return_timestamps: true,
+			force_full_sequences: false,
+			streamer,
 		});
 
 		if (cancelled) return;
 
-		const result: AutomaticSpeechRecognitionOutput = Array.isArray(rawResult)
-			? rawResult[0]
-			: rawResult;
+		const result = Array.isArray(output) ? output[0] : output;
 
 		const segments: TranscriptionSegment[] = [];
-
 		if (result.chunks) {
 			for (const chunk of result.chunks) {
 				if (chunk.timestamp && chunk.timestamp.length >= 2) {
@@ -165,6 +281,7 @@ async function handleTranscribe({
 			type: "transcribe-complete",
 			text: result.text,
 			segments,
+			tps,
 		} satisfies WorkerResponse);
 	} catch (error) {
 		if (cancelled) return;
