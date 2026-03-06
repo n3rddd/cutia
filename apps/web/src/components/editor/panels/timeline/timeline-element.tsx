@@ -431,6 +431,10 @@ function ElementContent({
 
 	if (element.type === "audio") {
 		const audioBuffer = element.buffer;
+		const audioBlob =
+			element.sourceType === "upload"
+				? mediaAssets.find((asset) => asset.id === element.mediaId)?.file
+				: undefined;
 
 		const audioUrl =
 			element.sourceType === "library"
@@ -443,7 +447,9 @@ function ElementContent({
 					<div className="min-w-0 flex-1">
 						<AudioWaveform
 							audioBuffer={audioBuffer}
+							audioBlob={audioBlob}
 							audioUrl={audioUrl}
+							duration={element.duration}
 							height={24}
 							className="w-full"
 						/>

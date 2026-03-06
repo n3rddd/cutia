@@ -3,7 +3,9 @@ import WaveSurfer from "wavesurfer.js";
 
 interface AudioWaveformProps {
 	audioUrl?: string;
+	audioBlob?: Blob;
 	audioBuffer?: AudioBuffer;
+	duration?: number;
 	height?: number;
 	className?: string;
 }
@@ -41,7 +43,9 @@ function extractPeaks({
 
 export function AudioWaveform({
 	audioUrl,
+	audioBlob,
 	audioBuffer,
+	duration: durationProp,
 	height = 32,
 	className = "",
 }: AudioWaveformProps) {
@@ -52,15 +56,28 @@ export function AudioWaveform({
 
 	useEffect(() => {
 		let mounted = true;
-		const ws = wavesurfer.current;
 
-		const initWaveSurfer = async () => {
-			if (!waveformRef.current || (!audioUrl && !audioBuffer)) return;
+		setError(false);
+		setIsLoading(true);
+
+		const destroyWaveSurfer = () => {
+			const currentWaveSurfer = wavesurfer.current;
+			wavesurfer.current = null;
+
+			if (!currentWaveSurfer) return;
 
 			try {
-				if (ws) {
-					wavesurfer.current = null;
-				}
+				currentWaveSurfer.destroy();
+			} catch {}
+		};
+
+		const initWaveSurfer = async () => {
+			if (!waveformRef.current || (!audioUrl && !audioBlob && !audioBuffer)) {
+				return;
+			}
+
+			try {
+				destroyWaveSurfer();
 
 				const newWaveSurfer = WaveSurfer.create({
 					container: waveformRef.current,
@@ -83,26 +100,19 @@ export function AudioWaveform({
 					return;
 				}
 
-				newWaveSurfer.on("ready", () => {
-					if (mounted) {
-						setIsLoading(false);
-						setError(false);
-					}
-				});
-
-				newWaveSurfer.on("error", (err) => {
-					if (mounted) {
-						console.error("WaveSurfer error:", err);
-						setError(true);
-						setIsLoading(false);
-					}
-				});
-
+				// Prefer buffer/blob loading to avoid media metadata races.
 				if (audioBuffer) {
 					const peaks = extractPeaks({ buffer: audioBuffer });
-					newWaveSurfer.load("", peaks, audioBuffer.duration);
+					await newWaveSurfer.load("", peaks, audioBuffer.duration);
+				} else if (audioBlob) {
+					await newWaveSurfer.loadBlob(audioBlob, undefined, durationProp);
 				} else if (audioUrl) {
-					await newWaveSurfer.load(audioUrl);
+					await newWaveSurfer.load(audioUrl, undefined, durationProp);
+				}
+
+				if (mounted) {
+					setIsLoading(false);
+					setError(false);
 				}
 			} catch (err) {
 				if (mounted) {
@@ -113,38 +123,13 @@ export function AudioWaveform({
 			}
 		};
 
-		if (ws) {
-			const wsToDestroy = ws;
-			wavesurfer.current = null;
-
-			requestAnimationFrame(() => {
-				try {
-					wsToDestroy.destroy();
-				} catch {}
-				if (mounted) {
-					initWaveSurfer();
-				}
-			});
-		} else {
-			initWaveSurfer();
-		}
+		void initWaveSurfer();
 
 		return () => {
 			mounted = false;
-
-			const wsToDestroy = wavesurfer.current;
-
-			wavesurfer.current = null;
-
-			if (wsToDestroy) {
-				requestAnimationFrame(() => {
-					try {
-						wsToDestroy.destroy();
-					} catch {}
-				});
-			}
+			destroyWaveSurfer();
 		};
-	}, [audioUrl, audioBuffer, height]);
+	}, [audioUrl, audioBlob, audioBuffer, durationProp, height]);
 
 	if (error) {
 		return (
