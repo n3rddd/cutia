@@ -130,7 +130,20 @@ export const addTextToTimelineTool: AgentTool = {
 			fontSize: {
 				type: "number",
 				description:
-					"Font size in relative units scaled to canvas height (default: 15). Actual pixel size = fontSize × (canvasHeight / 90). For example, on a 1080p canvas, fontSize 15 renders as 180px.",
+					"Font size from 1 to 38. Rendered pixel size = fontSize × (canvasHeight / 90). On 1080p: Subtitle/caption: ~3-5, Normal text: ~6-10, Title: ~11-15, Large headline: ~16-25. Default: 15.",
+			},
+			fontFamily: {
+				type: "string",
+				description:
+					"Font family name (default: 'Arial'). Common options: 'Arial', 'Inter', 'Times New Roman', 'Georgia', etc.",
+			},
+			fontWeight: {
+				type: "string",
+				description: "Font weight: 'normal' or 'bold' (default: 'normal')",
+			},
+			fontStyle: {
+				type: "string",
+				description: "Font style: 'normal' or 'italic' (default: 'normal')",
 			},
 			color: {
 				type: "string",
@@ -138,24 +151,37 @@ export const addTextToTimelineTool: AgentTool = {
 			},
 			backgroundColor: {
 				type: "string",
-				description:
-					"Background color as hex string with alpha (default: 'transparent')",
-			},
-			fontWeight: {
-				type: "string",
-				description: "Font weight: 'normal' or 'bold' (default: 'normal')",
+				description: "Background color as hex string (default: 'transparent')",
 			},
 			textAlign: {
 				type: "string",
-				description: "Text alignment: 'left', 'center', or 'right' (default: 'center')",
+				description:
+					"Text alignment: 'left', 'center', or 'right' (default: 'center')",
 			},
 			positionX: {
 				type: "number",
-				description: "Horizontal position offset (-1 to 1, default: 0 = center)",
+				description:
+					"Horizontal pixel offset from canvas center. 0 = center. Positive = right, negative = left. Range depends on canvas width (e.g. -960 to 960 for 1920px wide).",
 			},
 			positionY: {
 				type: "number",
-				description: "Vertical position offset (-1 to 1, default: 0 = center)",
+				description:
+					"Vertical pixel offset from canvas center. 0 = center. Positive = down, negative = up. Range depends on canvas height (e.g. -540 to 540 for 1080px tall).",
+			},
+			scale: {
+				type: "number",
+				description:
+					"Transform scale factor (default: 1). Values > 1 enlarge, < 1 shrink.",
+			},
+			rotate: {
+				type: "number",
+				description:
+					"Rotation angle in degrees (default: 0). Positive = clockwise.",
+			},
+			opacity: {
+				type: "number",
+				description:
+					"Element opacity from 0 (transparent) to 1 (opaque). Default: 1.",
 			},
 		},
 		required: ["content"],
@@ -169,17 +195,20 @@ export const addTextToTimelineTool: AgentTool = {
 				content,
 				duration: (args.duration as number) ?? 5,
 				fontSize: args.fontSize as number | undefined,
+				fontFamily: args.fontFamily as string | undefined,
+				fontWeight: args.fontWeight as "normal" | "bold" | undefined,
+				fontStyle: args.fontStyle as "normal" | "italic" | undefined,
 				color: args.color as string | undefined,
 				backgroundColor: args.backgroundColor as string | undefined,
-				fontWeight: args.fontWeight as "normal" | "bold" | undefined,
 				textAlign: args.textAlign as "left" | "center" | "right" | undefined,
+				opacity: args.opacity as number | undefined,
 				transform: {
-					scale: 1,
+					scale: (args.scale as number) ?? 1,
 					position: {
 						x: (args.positionX as number) ?? 0,
 						y: (args.positionY as number) ?? 0,
 					},
-					rotate: 0,
+					rotate: (args.rotate as number) ?? 0,
 				},
 			},
 			startTime,
@@ -215,7 +244,8 @@ export const addAudioToTimelineTool: AgentTool = {
 			},
 			duration: {
 				type: "number",
-				description: "Duration in seconds (defaults to the audio's original duration)",
+				description:
+					"Duration in seconds (defaults to the audio's original duration)",
 			},
 		},
 		required: ["mediaId"],
@@ -281,23 +311,55 @@ export const updateElementTool: AgentTool = {
 			fontSize: {
 				type: "number",
 				description:
-					"New font size in relative units (actual px = value × canvasHeight / 90)",
+					"Font size from 1 to 38 (text elements only). On 1080p: Subtitle: ~3-5, Normal: ~6-10, Title: ~11-15, Headline: ~16-25.",
 			},
-			color: { type: "string", description: "New text color (hex)" },
-			backgroundColor: { type: "string", description: "New background color (hex)" },
-			fontWeight: { type: "string", description: "'normal' or 'bold'" },
-			textAlign: { type: "string", description: "'left', 'center', or 'right'" },
+			fontFamily: {
+				type: "string",
+				description:
+					"Font family name, e.g. 'Arial', 'Inter' (text elements only)",
+			},
+			fontWeight: {
+				type: "string",
+				description: "'normal' or 'bold' (text elements only)",
+			},
+			fontStyle: {
+				type: "string",
+				description: "'normal' or 'italic' (text elements only)",
+			},
+			color: {
+				type: "string",
+				description: "Text color as hex string (text elements only)",
+			},
+			backgroundColor: {
+				type: "string",
+				description: "Background color as hex string (text elements only)",
+			},
+			textAlign: {
+				type: "string",
+				description: "'left', 'center', or 'right' (text elements only)",
+			},
 			opacity: {
 				type: "number",
-				description: "Element opacity (0 to 1)",
+				description: "Element opacity from 0 (transparent) to 1 (opaque)",
 			},
 			scale: {
 				type: "number",
-				description: "Transform scale factor",
+				description: "Transform scale factor. Values > 1 enlarge, < 1 shrink.",
 			},
-			positionX: { type: "number", description: "Horizontal position offset" },
-			positionY: { type: "number", description: "Vertical position offset" },
-			rotate: { type: "number", description: "Rotation in degrees" },
+			positionX: {
+				type: "number",
+				description:
+					"Horizontal pixel offset from canvas center. 0 = center. Positive = right, negative = left.",
+			},
+			positionY: {
+				type: "number",
+				description:
+					"Vertical pixel offset from canvas center. 0 = center. Positive = down, negative = up.",
+			},
+			rotate: {
+				type: "number",
+				description: "Rotation angle in degrees. Positive = clockwise.",
+			},
 		},
 		required: ["trackId", "elementId"],
 	},
@@ -310,10 +372,12 @@ export const updateElementTool: AgentTool = {
 
 		if (args.content !== undefined) updates.content = args.content;
 		if (args.fontSize !== undefined) updates.fontSize = args.fontSize;
+		if (args.fontFamily !== undefined) updates.fontFamily = args.fontFamily;
+		if (args.fontWeight !== undefined) updates.fontWeight = args.fontWeight;
+		if (args.fontStyle !== undefined) updates.fontStyle = args.fontStyle;
 		if (args.color !== undefined) updates.color = args.color;
 		if (args.backgroundColor !== undefined)
 			updates.backgroundColor = args.backgroundColor;
-		if (args.fontWeight !== undefined) updates.fontWeight = args.fontWeight;
 		if (args.textAlign !== undefined) updates.textAlign = args.textAlign;
 		if (args.opacity !== undefined) updates.opacity = args.opacity;
 
