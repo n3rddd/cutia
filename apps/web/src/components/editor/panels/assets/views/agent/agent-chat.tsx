@@ -1,11 +1,15 @@
 "use client";
 
 import { useTranslation } from "@i18next-toolkit/nextjs-approuter";
-import { useCallback, useEffect, useRef } from "react";
+import { Fragment, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAgentStore } from "@/stores/agent-store";
 import type { AgentMessage as AgentMessageType } from "@/lib/ai/agent/types";
+import {
+	type ExpertRoleId,
+	getExpertRole,
+} from "@/lib/ai/agent/expert-roles";
 import { AgentMessage } from "./agent-message";
 import {
 	CheckmarkCircle02Icon,
@@ -15,6 +19,38 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 
 const SCROLL_BOTTOM_THRESHOLD = 40;
+
+function getSuccessfulRoleSwitch({
+	message,
+	toolResultMap,
+}: {
+	message: AgentMessageType;
+	toolResultMap: Map<string, { success: boolean; message: string }>;
+}): ExpertRoleId | null {
+	if (!message.toolCalls) return null;
+	const switchCall = message.toolCalls.find(
+		(tc) => tc.name === "switch_expert_role",
+	);
+	if (!switchCall) return null;
+	const result = toolResultMap.get(switchCall.id);
+	if (!result?.success) return null;
+	return (switchCall.arguments as { role?: string }).role as ExpertRoleId;
+}
+
+function RoleSwitchIndicator({ roleId }: { roleId: ExpertRoleId }) {
+	const { t } = useTranslation();
+	const role = getExpertRole({ roleId });
+
+	return (
+		<div className="flex items-center gap-2 py-1">
+			<div className="bg-border h-px flex-1" />
+			<span className="text-muted-foreground bg-muted rounded-full px-2.5 py-0.5 text-xs whitespace-nowrap">
+				{t("Switched to {{role}}", { role: role.getLabel() })}
+			</span>
+			<div className="bg-border h-px flex-1" />
+		</div>
+	);
+}
 
 export function AgentChat() {
 	const { t } = useTranslation();
@@ -111,14 +147,24 @@ export function AgentChat() {
 					</div>
 				)}
 
-				{visibleMessages.map((message: AgentMessageType) => (
-					<AgentMessage
-						key={message.id}
-						message={message}
-						executingToolId={currentToolCall}
-						toolResults={toolResultMap}
-					/>
-				))}
+				{visibleMessages.map((message: AgentMessageType) => {
+					const switchedRole = getSuccessfulRoleSwitch({
+						message,
+						toolResultMap,
+					});
+					return (
+						<Fragment key={message.id}>
+							<AgentMessage
+								message={message}
+								executingToolId={currentToolCall}
+								toolResults={toolResultMap}
+							/>
+							{switchedRole && (
+								<RoleSwitchIndicator roleId={switchedRole} />
+							)}
+						</Fragment>
+					);
+				})}
 
 				{status === "thinking" && streamingContent && (
 					<AgentMessage
