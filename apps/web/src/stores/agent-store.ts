@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { generateUUID } from "@/utils/id";
+import {
+	type ExpertRoleId,
+	DEFAULT_EXPERT_ROLE,
+} from "@/lib/ai/agent/expert-roles";
 import { runAgentLoop } from "@/lib/ai/agent/service";
 import type {
 	AgentLLMConfig,
@@ -13,6 +17,7 @@ interface AgentPersistedState {
 	config: AgentLLMConfig;
 	autoMode: boolean;
 	isOpen: boolean;
+	expertRole: ExpertRoleId;
 }
 
 interface AgentState extends AgentPersistedState {
@@ -33,6 +38,7 @@ interface AgentState extends AgentPersistedState {
 	clearMessages: () => void;
 	setAutoMode: (enabled: boolean) => void;
 	setConfig: (config: Partial<AgentLLMConfig>) => void;
+	setExpertRole: (roleId: ExpertRoleId) => void;
 }
 
 let abortController: AbortController | null = null;
@@ -48,6 +54,7 @@ export const useAgentStore = create<AgentState>()(
 			},
 			autoMode: false,
 			isOpen: false,
+			expertRole: DEFAULT_EXPERT_ROLE,
 			messages: [],
 			status: "idle" as AgentStatus,
 			currentToolCall: null,
@@ -96,6 +103,7 @@ export const useAgentStore = create<AgentState>()(
 						config: state.config,
 						messages: currentMessages,
 						autoMode: state.autoMode,
+						roleId: state.expertRole,
 						signal: abortController.signal,
 						callbacks: {
 							onMessageStart: () => {
@@ -226,6 +234,10 @@ export const useAgentStore = create<AgentState>()(
 					config: { ...prev.config, ...config },
 				}));
 			},
+
+			setExpertRole: (roleId) => {
+				set({ expertRole: roleId });
+			},
 		}),
 		{
 			name: "agent-settings",
@@ -233,6 +245,7 @@ export const useAgentStore = create<AgentState>()(
 				config: state.config,
 				autoMode: state.autoMode,
 				isOpen: state.isOpen,
+				expertRole: state.expertRole,
 			}),
 			merge: (persisted, current) => ({
 				...(current as AgentState),

@@ -3,6 +3,15 @@
 import { useTranslation } from "@i18next-toolkit/nextjs-approuter";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import type { ExpertRoleId } from "@/lib/ai/agent/expert-roles";
+import { EXPERT_ROLES } from "@/lib/ai/agent/expert-roles";
 import { useAgentStore } from "@/stores/agent-store";
 import { AgentChat } from "./agent-chat";
 import { AgentInput } from "./agent-input";
@@ -23,6 +32,9 @@ export function AgentView() {
 	const sendMessage = useAgentStore((s) => s.sendMessage);
 	const cancel = useAgentStore((s) => s.cancel);
 	const clearMessages = useAgentStore((s) => s.clearMessages);
+	const expertRole = useAgentStore((s) => s.expertRole);
+	const setExpertRole = useAgentStore((s) => s.setExpertRole);
+	const isBusy = status !== "idle" && status !== "error";
 
 	const isConfigured = Boolean(config.apiKey);
 
@@ -37,14 +49,9 @@ export function AgentView() {
 						onClick={() => setShowSettings(false)}
 						title={t("Back")}
 					>
-						<HugeiconsIcon
-							icon={ArrowLeft02Icon}
-							className="h-4 w-4"
-						/>
+						<HugeiconsIcon icon={ArrowLeft02Icon} className="h-4 w-4" />
 					</Button>
-					<span className="text-sm font-medium">
-						{t("Agent Settings")}
-					</span>
+					<span className="text-sm font-medium">{t("Agent Settings")}</span>
 				</div>
 				<div className="flex-1 overflow-auto p-4">
 					<AgentSettings />
@@ -57,19 +64,14 @@ export function AgentView() {
 		return (
 			<div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
 				<p className="text-muted-foreground text-sm">
-					{t(
-						"Configure an OpenAI-compatible API to start using the AI Agent.",
-					)}
+					{t("Configure an OpenAI-compatible API to start using the AI Agent.")}
 				</p>
 				<Button
 					type="button"
 					variant="outline"
 					onClick={() => setShowSettings(true)}
 				>
-					<HugeiconsIcon
-						icon={Settings01Icon}
-						className="mr-2 h-4 w-4"
-					/>
+					<HugeiconsIcon icon={Settings01Icon} className="mr-2 h-4 w-4" />
 					{t("Configure API")}
 				</Button>
 			</div>
@@ -78,9 +80,26 @@ export function AgentView() {
 
 	return (
 		<div className="flex h-full flex-col">
-			<div className="flex items-center justify-between border-b px-3 py-2">
-				<span className="text-sm font-medium">{t("AI Agent")}</span>
-				<div className="flex items-center gap-1">
+			<div className="flex items-center justify-between border-b px-1.5 py-1.5">
+				<Select
+					value={expertRole}
+					onValueChange={(value) => setExpertRole(value as ExpertRoleId)}
+					disabled={isBusy}
+				>
+					<SelectTrigger className="h-7 w-auto text-xs">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{EXPERT_ROLES.map((role) => (
+							<SelectItem key={role.id} value={role.id}>
+								<div className="flex flex-col">
+									<span>{role.getLabel()}</span>
+								</div>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+				<div className="flex shrink-0 items-center gap-1">
 					{messages.length > 0 && (
 						<Button
 							type="button"
@@ -90,10 +109,7 @@ export function AgentView() {
 							title={t("Clear chat")}
 							className="h-7 w-7"
 						>
-							<HugeiconsIcon
-								icon={Delete02Icon}
-								className="h-3.5 w-3.5"
-							/>
+							<HugeiconsIcon icon={Delete02Icon} className="h-3.5 w-3.5" />
 						</Button>
 					)}
 					<Button
@@ -104,21 +120,14 @@ export function AgentView() {
 						title={t("Settings")}
 						className="h-7 w-7"
 					>
-						<HugeiconsIcon
-							icon={Settings01Icon}
-							className="h-3.5 w-3.5"
-						/>
+						<HugeiconsIcon icon={Settings01Icon} className="h-3.5 w-3.5" />
 					</Button>
 				</div>
 			</div>
 
 			<AgentChat />
 
-			<AgentInput
-				status={status}
-				onSend={sendMessage}
-				onCancel={cancel}
-			/>
+			<AgentInput status={status} onSend={sendMessage} onCancel={cancel} />
 		</div>
 	);
 }

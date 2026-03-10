@@ -1,7 +1,17 @@
 import { EditorCore } from "@/core";
 import { useCharacterStore } from "@/stores/character-store";
+import {
+	type ExpertRoleId,
+	DEFAULT_EXPERT_ROLE,
+	DIRECTOR_SYSTEM_PROMPT_ADDITION,
+	getExpertRole,
+} from "./expert-roles";
 
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt({
+	roleId = DEFAULT_EXPERT_ROLE,
+}: {
+	roleId?: ExpertRoleId;
+} = {}): string {
 	const editor = EditorCore.getInstance();
 	const project = editor.project.getActiveOrNull();
 	const tracks = editor.timeline.getTracks();
@@ -69,6 +79,11 @@ ${tracks
 `
 			: "";
 
+	const rolePromptAddition =
+		roleId === "auto"
+			? DIRECTOR_SYSTEM_PROMPT_ADDITION
+			: getExpertRole({ roleId }).systemPromptAddition;
+
 	return `You are an AI video editing assistant embedded in a browser-based video editor. You help users create and edit videos by using the available tools.
 
 ## Capabilities
@@ -102,5 +117,6 @@ You can:
 - Use list_characters to see available characters. Use characterId or characterName in generate_image / generate_video to automatically use a character's reference image.
 - When a character is used as reference, the generated content is automatically associated with that character.
 - Prefer using characterId/characterName over referenceMediaId when the user mentions a specific character by name.
+${rolePromptAddition}
 ${characterContext}${projectContext}${assetsContext}${timelineContext}`;
 }

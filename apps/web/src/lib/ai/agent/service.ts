@@ -1,8 +1,14 @@
 import { generateUUID } from "@/utils/id";
+import {
+	type ExpertRoleId,
+	DEFAULT_EXPERT_ROLE,
+	SELECTABLE_EXPERT_ROLE_IDS,
+	getExpertRole,
+} from "./expert-roles";
 import { streamChatCompletion } from "./llm-client";
 import { buildSystemPrompt } from "./system-prompt";
 import { getAllToolSchemas, getToolByName } from "./tools";
-import type { AgentTool } from "./tools/types";
+import { type AgentTool, buildToolSchema } from "./tools/types";
 import type {
 	AgentLLMConfig,
 	AgentMessage,
@@ -186,21 +192,71 @@ async function executeToolCallBatch({
 	}
 }
 
+function buildSwitchRoleTool({
+	onSwitch,
+}: {
+	onSwitch: (roleId: ExpertRoleId) => void;
+}): AgentTool {
+	return {
+		name: "switch_expert_role",
+		description:
+			"Switch your active expert role to leverage specialized knowledge for the current phase. Only available in Director (auto) mode.",
+		parameters: {
+			type: "object",
+			properties: {
+				role: {
+					type: "string",
+					enum: SELECTABLE_EXPERT_ROLE_IDS,
+					description: `The expert role to switch to. Options: ${SELECTABLE_EXPERT_ROLE_IDS.map((id) => `"${id}" (${getExpertRole({ roleId: id }).getLabel()})`).join(", ")}`,
+				},
+			},
+			required: ["role"],
+		},
+		execute: async (args: Record<string, unknown>) => {
+			const role = args.role as ExpertRoleId;
+			if (!SELECTABLE_EXPERT_ROLE_IDS.includes(role)) {
+				return {
+					success: false,
+					message: `Invalid role: ${role}. Available roles: ${SELECTABLE_EXPERT_ROLE_IDS.join(", ")}`,
+				};
+			}
+			onSwitch(role);
+			const expertRole = getExpertRole({ roleId: role });
+			return {
+				success: true,
+				message: `Switched to ${expertRole.getLabel()} role. Your next actions should leverage this expert's specialized knowledge.`,
+			};
+		},
+	};
+}
+
 export async function runAgentLoop({
 	config,
 	messages,
 	autoMode,
 	callbacks,
 	signal,
+	roleId = DEFAULT_EXPERT_ROLE,
 }: {
 	config: AgentLLMConfig;
 	messages: AgentMessage[];
 	autoMode: boolean;
 	callbacks: AgentServiceCallbacks;
 	signal: AbortSignal;
+	roleId?: ExpertRoleId;
 }): Promise<AgentMessage[]> {
-	const systemPrompt = buildSystemPrompt();
-	const toolSchemas = getAllToolSchemas();
+	let activeRoleId = roleId;
+	const isDirectorMode = roleId === "auto";
+
+	const switchRoleTool: AgentTool | null = isDirectorMode
+		? buildSwitchRoleTool({
+				onSwitch: (newRoleId) => {
+					activeRoleId = newRoleId;
+				},
+			})
+		: null;
+
+	const baseToolSchemas = getAllToolSchemas();
 	const conversationMessages = [...messages];
 	let rounds = 0;
 
@@ -209,6 +265,11 @@ export async function runAgentLoop({
 		rounds++;
 
 		callbacks.onMessageStart();
+
+		const systemPrompt = buildSystemPrompt({ roleId: activeRoleId });
+		const toolSchemas = switchRoleTool
+			? [...baseToolSchemas, buildToolSchema({ tool: switchRoleTool })]
+			: baseToolSchemas;
 
 		const openaiMessages: OpenAIChatMessage[] = [
 			{ role: "system", content: systemPrompt },
@@ -255,13 +316,20 @@ export async function runAgentLoop({
 			break;
 		}
 
+		const resolveToolByName = ({ name }: { name: string }) => {
+			if (switchRoleTool && name === switchRoleTool.name) {
+				return switchRoleTool;
+			}
+			return getToolByName({ name });
+		};
+
 		const toolCallEntries = result.toolCalls.map((rawToolCall) => ({
 			rawToolCall,
 			parsedArgs: JSON.parse(rawToolCall.arguments || "{}") as Record<
 				string,
 				unknown
 			>,
-			tool: getToolByName({ name: rawToolCall.name }),
+			tool: resolveToolByName({ name: rawToolCall.name }),
 		}));
 
 		const confirmableEntries = toolCallEntries.filter(
