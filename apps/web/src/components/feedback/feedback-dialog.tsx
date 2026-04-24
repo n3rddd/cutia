@@ -58,7 +58,12 @@ export function FeedbackDialog({
 		watch,
 		formState: { errors },
 	} = useForm<FeedbackFormValues>({
-		resolver: zodResolver(feedbackSchema),
+		// monorepo has both zod v3 and v4 installed; @hookform/resolvers@3.10.0
+		// type signature collapses to a different zod instance than the schema's,
+		// so cast through unknown to bridge the structurally-identical types.
+		resolver: zodResolver(
+			feedbackSchema as unknown as Parameters<typeof zodResolver>[0],
+		),
 		defaultValues: { content: "", contact: "" },
 	});
 
